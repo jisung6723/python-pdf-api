@@ -30,6 +30,9 @@ class PDFObject(ABC):
     def to_bytes(self) -> bytes:
         raise Exception("Abstract method")
 
+    def to_python(self) -> Any:
+        return self.value
+
 
 class PDFNull(Singleton, PDFObject):
     value = None
@@ -150,6 +153,9 @@ class PDFArray(PDFObject):
     def to_bytes(self) -> bytes:
         return b"[ " + b" ".join(map(lambda obj: obj.to_bytes(), self.value)) + b" ]"
 
+    def to_python(self) -> List[Any]:
+        return [v.to_python() for v in self.value]
+
 
 class PDFDict(PDFObject):
     value: Dict[bytes, PDFObject]
@@ -164,7 +170,10 @@ class PDFDict(PDFObject):
         return self.value[key]
 
     def __setitem__(self, key: PDFName | bytes, value: PDFObject) -> None:
+        if key in self.value and self.value[key] == value:
+            return
         self.value[key] = value
+        self.mark_modified()
 
     def __delitem__(self, key: PDFName | bytes) -> None:
         del self.value[key]
@@ -173,8 +182,12 @@ class PDFDict(PDFObject):
         return key in self.value
 
     def to_bytes(self) -> bytes:
+        def _f(key: bytes):
+            name = PDFName(self._file, key)
+            return name.to_bytes() + b" " + self.value[key].to_bytes()
+
         return (b"<<\n" +
-                b"\n".join(map(lambda key: key.to_bytes() + b" " + self.value[key].to_bytes(), self.value))
+                b"\n".join(map(_f, self.value))
                 + b">>")
 
     def get(self, key: PDFName | str | bytes) -> PDFObject:
@@ -190,6 +203,9 @@ class PDFDict(PDFObject):
         if isinstance(val, _type):
             return val
         raise Exception(f"Expect {_type.__name__} but got {type(val).__name__}")
+
+    def to_python(self) -> Dict[bytes, Any]:
+        return {k: v.to_python() for k, v in self.value.items()}
 
 
 class PDFStream(PDFObject):
@@ -212,11 +228,15 @@ class IndRef(PDFObject):
 
     def __init__(self, file: PDFFile, N: int, G: int):
         super().__init__(file)
+        self._ref = self
         self.N = N
         self.G = G
 
     def to_bytes(self) -> bytes:
         return f"{self.N} {self.G} R".encode('ascii')
+
+    def to_python(self) -> Any:
+        return self.resolve().to_python()
 
     def resolve(self) -> PDFObject:
         obj = self._file.resolve(self)
@@ -234,7 +254,4 @@ class IndRef(PDFObject):
 
 
 T = TypeVar("T")
-IType = Union[T, IndRef]  # may be an indirect reference
 Nullable = Union[T, PDFNull]  # optional
-NIType = Union[T, IndRef, PDFNull] # optional and may be an indirect Reference
-

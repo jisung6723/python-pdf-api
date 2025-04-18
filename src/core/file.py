@@ -28,6 +28,7 @@ class PDFFile:
         if filename.endswith('.pdf'):
             if os.path.exists(filename):
                 self.read()
+        self.updated_ref = set()
 
     def _read_body(self):
         doc = self.doc
@@ -168,7 +169,7 @@ class Trailer:
 
     @property
     def Size(self) -> int:
-        return self.extent[b"Size"].value
+        return self.extent[b"Size"].to_python()
 
     @Size.setter
     def Size(self, size: int) -> None:
@@ -176,7 +177,7 @@ class Trailer:
 
     @property
     def Prev(self) -> Optional[int]:
-        return self.extent[b"Prev"].value
+        return self.extent[b"Prev"].to_python()
 
     @Prev.setter
     def Prev(self, offset: Optional[int]) -> None:
@@ -189,17 +190,17 @@ class Trailer:
         return self.extent.get_expected(b"Root", PDFDict)
 
     @Root.setter
-    def Root(self, root: IType[PDFDict]) -> None:
+    def Root(self, root: PDFDict | IndRef) -> None:
         if isinstance(root, PDFDict):
             root = self.file.add_new_ref(root)
         self.extent[b"Root"] = root
 
     @property
-    def Encrypt(self) -> NIType[PDFDict]:
-        return self.extent.get_expected(b"Encrypt", NIType[PDFDict])
+    def Encrypt(self) -> Nullable[PDFDict]:
+        return self.extent.get_expected(b"Encrypt", Nullable[PDFDict])
 
     @Encrypt.setter
-    def Encrypt(self, encrypt: NIType[PDFDict]) -> None:
+    def Encrypt(self, encrypt: Nullable[PDFDict]) -> None:
         self.extent[b"Encrypt"] = encrypt
 
     @property
@@ -211,12 +212,8 @@ class Trailer:
         self.extent[b"Info"] = info
 
     @property
-    def ID(self) -> Optional[List[bytes]]:
-        _id = self.extent.get_expected(b"ID", NIType[PDFArray]).value
-        if _id is None:
-            return None
-        _id = [s.value for s in _id]
-        return _id
+    def ID(self) -> Nullable[PDFArray]:
+        return self.extent.get_expected(b"ID", Nullable[PDFArray])
 
     @ID.setter
     def ID(self, ids: Optional[List[bytes]] | Nullable[PDFArray]) -> None:

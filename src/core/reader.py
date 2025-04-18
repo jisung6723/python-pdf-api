@@ -168,7 +168,7 @@ class Parser:
                     break
                 key = Parser.parse_object(tk, file)
                 val = Parser.parse_object(tk, file)
-                ret[key] = val
+                ret[key.value] = val
             if tk.peek() == b"stream":
                 tk.next()
                 length = ret[PDFName(file, b"Length")].value
