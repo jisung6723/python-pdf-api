@@ -34,6 +34,18 @@ def rfind_from_memoryview(x: bytes, src: memoryview, start_pos=0, end_pos=-1) ->
     return -1
 
 
+def camel_to_snake(name: str) -> str:
+    ret = ""
+    for c in name:
+        if c.isupper():
+            if len(ret) > 0:
+                ret += "_"
+            ret += c.lower()
+        else:
+            ret += c
+    return ret
+
+
 class Singleton(object):
     _instance = None
 

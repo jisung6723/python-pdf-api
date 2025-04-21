@@ -83,6 +83,7 @@ class XRefParser:
         tk.seek(offset)
         if tk.peek() == b"xref":
             return XRefParser.parse_xref_table(tk, file)
+        return XRefParser.parse_xref_stream(tk, file)
 
     @staticmethod
     def parse_xref_table(tk: Tokenizer, file: PDFFile) -> Tuple[XRef, PDFDict]:
@@ -104,3 +105,17 @@ class XRefParser:
         tk.next()
         trailer = Parser.parse_object(tk, file)
         return xref, trailer
+
+    @staticmethod
+    def parse_xref_stream(tk: Tokenizer, file: PDFFile) -> Tuple[XRef, PDFDict]:
+        xref = XRef(file)
+
+        tk.next()
+        tk.next()
+        if tk.next() != b"obj":
+            raise SyntaxError("Expected obj, but not found")
+
+        stream = Parser.parse_object(tk, file)
+        if tk.next() != b'endobj':
+            raise SyntaxError("Expected endobj but not found")
+        
