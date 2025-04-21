@@ -6,6 +6,7 @@ import io
 
 from .objects import *
 from .reader import Tokenizer, Parser
+from .stream import Stream
 
 
 class RefSrc:
@@ -77,6 +78,39 @@ class XRef:
         return PDFNull(self.file)
 
 
+class XRefStream(Stream):
+    def __init__(self, stream: PDFStream):
+        super().__init__(stream)
+
+    @property
+    def Type(self) -> bytes:
+        return self.extent.get_expected('Type', PDFName).to_python()
+
+    @property
+    def Size(self) -> int:
+        return self.extent.get_expected('Size', PDFInt).to_python()
+
+    @Size.setter
+    def Size(self, size: int) -> None:
+        self.extent[b'Size'] = PDFInt(self.file, size)
+
+    @property
+    def Index(self) -> list:
+        return self.extent.get_expected('Index', PDFArray).to_python()
+
+    @Index.setter
+    def Index(self, index: list) -> None:
+        self.extent[b'Index'] = PDFArray(self.file, index)
+
+    @property
+    def Prev(self) -> int:
+        return self.extent.get_expected('Prev', PDFInt).to_python()
+
+    @Prev.setter
+    def Prev(self, index: int) -> None:
+        self.extent[b'Prev'] = PDFInt(self.file, index)
+
+
 class XRefParser:
     @staticmethod
     def parse_xref(tk: Tokenizer, file: PDFFile, offset: int) -> Tuple[XRef, PDFDict]:
@@ -115,7 +149,7 @@ class XRefParser:
         if tk.next() != b"obj":
             raise SyntaxError("Expected obj, but not found")
 
-        stream = Parser.parse_object(tk, file)
+        stream = XRefStream(Parser.parse_object(tk, file))
         if tk.next() != b'endobj':
             raise SyntaxError("Expected endobj but not found")
         

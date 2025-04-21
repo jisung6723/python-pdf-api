@@ -8,6 +8,7 @@ from PIL import Image
 from io import BytesIO
 from ._utils import whitespace_chars, camel_to_snake
 from .objects import *
+from .reader import Tokenizer, Parser
 from .file import PDFFile
 
 
@@ -75,6 +76,54 @@ class Stream:
 
         self.decoded_value = dv
         return self.decoded_value
+
+
+class ObjectStream(Stream):
+    def __init__(self, stream: PDFStream):
+        super().__init__(stream)
+        self.obj = []
+        if len(self.value):
+            self._read(self.decode())
+
+    @property
+    def Type(self) -> bytes:
+        return self.extent.get_expected(b'Type', PDFName).to_python()
+
+    @property
+    def N(self) -> int:
+        return self.extent.get_expected(b'N', PDFInt).to_python()
+
+    @N.setter
+    def N(self, value: int):
+        self.extent[b'N'] = PDFInt(self.file, value)
+
+    @property
+    def First(self) -> int:
+        return self.extent.get_expected(b'First', PDFInt).to_python()
+
+    @First.setter
+    def First(self, value: int):
+        self.extent[b'First'] = PDFInt(self.file, value)
+
+    @property
+    def Extends(self) -> Nullable[PDFStream]:
+        return self.extent.get_expected(b'Extends', Nullable[PDFStream])
+
+    @Extends.setter
+    def Extends(self, value: Nullable[PDFStream]):
+        self.extent[b'Extends'] = value
+
+    def _read(self, value: bytes) -> None:
+        tk = Tokenizer(memoryview(value))
+        self.obj = []
+        while tk.pos < self.First and len(self.obj) < self.N:
+            n = int(tk.next())
+            off = int(tk.next())
+            pos = tk.pos
+            tk.seek(off + self.First)
+            self.obj.append(Parser.parse_object(tk, self.file))
+            self.file.mark_updated(IndRef(self.file, n, 0), self.obj[-1])
+            tk.seek(pos)
 
 
 class Filter:
@@ -359,4 +408,3 @@ class Filter:
                 ret += value[pos + 1:pos + 257 - header]
                 pos = pos + 257 - header
         return ret
-
